@@ -3,7 +3,7 @@
 A small macOS menu bar app that shows what all your Claude Code sessions are doing — and pops open by itself the moment one gets stuck waiting for you.
 
 ```
-✳  ❗ 2  ⚙️ 1  ✅ 4
+✳  ❗ 2  🔄 1  ✅ 4
 ```
 
 Two sessions are waiting for you, one is working, four are done.

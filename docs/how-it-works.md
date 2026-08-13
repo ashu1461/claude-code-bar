@@ -201,9 +201,9 @@ When a number looks wrong, ask the app instead of guessing:
 ```
 
 ```
-Menu bar shows: ❗ 0  ⚙️ 2  ✅ 3
+Menu bar shows: ❗ 0  🔄 2  ✅ 3
 
-⚙️ Running — 2
+🔄 Running — 2
       claude-code-bar-c2 · Terminal.app
             "Build Mac menu bar app for Claude sessions"
       payments-api-4f · VS Code terminal

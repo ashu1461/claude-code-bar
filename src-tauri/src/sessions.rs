@@ -39,7 +39,7 @@ impl Bucket {
     pub fn marker(self) -> &'static str {
         match self {
             Bucket::Waiting => "❗",
-            Bucket::Running => "⚙️",
+            Bucket::Running => "🔄",
             Bucket::Done => "✅",
             Bucket::Unknown => "💤",
         }
@@ -573,11 +573,11 @@ mod tests {
             done: 4,
             unknown: 0,
         };
-        assert_eq!(counts.tray_title(), "❗ 2  ⚙️ 1  ✅ 4");
+        assert_eq!(counts.tray_title(), "❗ 2  🔄 1  ✅ 4");
 
         // Sessions that report nothing stay out of the menu bar entirely.
         counts.unknown = 3;
-        assert_eq!(counts.tray_title(), "❗ 2  ⚙️ 1  ✅ 4");
+        assert_eq!(counts.tray_title(), "❗ 2  🔄 1  ✅ 4");
     }
 
     #[test]
