@@ -214,10 +214,6 @@
   }
   .row.clickable:hover .chev { opacity: 1; }
 
-  /* Dimmer, because the click does less: it opens the application rather
-     than landing on this session. */
-  .chev.approx { font-size: 11px; }
-  .row.clickable:hover .chev.approx { opacity: 0.55; }
 
   .empty {
     padding: 26px 14px;
@@ -332,17 +328,13 @@
     }
 
     const chevron = document.createElement("span");
-    chevron.className = session.precise ? "chev" : "chev approx";
-    // An arrow for landing on the exact session, an outward arrow for merely
-    // opening the application that holds it.
-    chevron.textContent = session.precise ? "›" : "↗";
+    chevron.className = "chev";
+    chevron.textContent = "›";
 
     row.append(dot(session.bucket), body, chevron);
 
     if (session.focusable) {
-      row.title = session.precise
-        ? "Jump to this session"
-        : `Show this project in ${session.host.replace(/ (terminal|extension)$/, "")}`;
+      row.title = "Jump to this session";
       row.addEventListener("click", async () => {
         await invoke("focus_session", { pid: session.pid });
         await invoke("hide_panel");

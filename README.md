@@ -76,17 +76,9 @@ Every row leads with the **session title** — Claude Code's own one-line descri
 
 Sessions with no status stay in the panel but are kept out of the menu bar counts — a number you cannot act on is not worth the width.
 
-**Click a row to jump to that session.** A row is clickable only when there is somewhere real to land, and the arrow says which:
+**Sessions running in Terminal.app or iTerm2 are clickable** — a `›` marks them, and clicking selects that exact tab. Both terminals expose their tabs to scripting, so the app can match the session's terminal device and land on precisely the right one.
 
-| Arrow | What happens | When |
-|---|---|---|
-| `›` | Selects **that exact tab** | Terminal.app and iTerm2, which expose their tabs to scripting |
-| `↗` | Brings forward the **window already showing that project** | The folder is currently open in VS Code, Cursor, or a JetBrains editor |
-| *(none)* | Not clickable, shown as plain information | Anything else |
-
-**It will never open a new window.** That is the rule the design follows, and it is why the third row exists. Handing an editor a folder means "open this", so if the folder is not already open you get a new window instead of your work — which is worse than the click doing nothing. So the app checks what your editors actually have open and only offers a click when it will land on an existing window.
-
-One case it cannot resolve: if several sessions share a folder, those rows all bring up the same window, because nothing distinguishes them from outside the editor.
+**Every other row is plain information.** Editors have no scriptable route to an individual Claude panel. The nearest thing available is asking the system to open the session's folder, which means "open this document" — and that reliably produced **new windows** instead of taking you to your work. A click that clutters your screen is worse than a row that plainly does nothing, so those rows do not invite one.
 
 ## How to install
 

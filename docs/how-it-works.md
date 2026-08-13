@@ -112,7 +112,7 @@ One call gives parent links, process names, and the terminal devices needed for 
 
 ## 5. Jumping to a session
 
-Two strategies, picked by what the host application supports.
+One strategy, and one deliberate refusal.
 
 **Exact — Terminal.app and iTerm2.** Both expose each tab's TTY device to AppleScript. Since every Claude session owns a distinct TTY, we can match it and select that precise tab:
 
@@ -188,7 +188,6 @@ claude-code-bar/
 │   │   ├── titles.rs      # digs the session title out of the transcript
 │   │   ├── focus.rs       # which app a session runs in, and jumping to it
 │   │   ├── blocked.rs     # spots sessions crossing into the waiting state
-│   │   ├── workspaces.rs  # which folders an editor actually has open
 │   │   ├── panel.rs       # the dropdown window, and where it opens
 │   │   ├── tray.rs        # the menu bar item, the poll loop, the dot animation
 │   │   ├── state.rs       # shared registry and latest snapshot

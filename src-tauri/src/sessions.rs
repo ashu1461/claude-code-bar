@@ -6,7 +6,6 @@
 
 use crate::focus::{Host, HostKind, HostResolver};
 use crate::titles::TitleCache;
-use crate::workspaces::OpenWorkspaces;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -213,9 +212,6 @@ pub struct SessionView {
     /// Whether clicking the row goes anywhere. False rows are shown as plain
     /// information rather than inviting a click that cannot be honoured.
     pub focusable: bool,
-    /// Whether clicking lands on this exact session, or only on the
-    /// application holding it.
-    pub precise: bool,
 }
 
 /// The tally shown in the menu bar.
@@ -270,9 +266,9 @@ pub struct SessionRegistry {
     system: System,
     titles: TitleCache,
     hosts: HostResolver,
-    /// Where each live session is running, with its folder, kept so a click
-    /// can act on it without re-walking the process tree.
-    known_hosts: HashMap<u32, (Host, Option<String>)>,
+    /// Where each live session is running, kept so a click can act on it
+    /// without re-walking the process tree.
+    known_hosts: HashMap<u32, Host>,
 }
 
 impl SessionRegistry {
@@ -312,10 +308,6 @@ impl SessionRegistry {
                 .then_with(|| a.project_name().cmp(&b.project_name()))
         });
 
-        // Read once per refresh: which project folders an editor already has
-        // open. Passing any other folder would open a new window.
-        let open_workspaces = OpenWorkspaces::read(|pid| self.hosts.is_running(pid));
-
         let mut counts = Counts::default();
         let mut sessions = Vec::with_capacity(records.len());
         let mut known_hosts = HashMap::with_capacity(records.len());
@@ -334,14 +326,6 @@ impl SessionRegistry {
                 .as_deref()
                 .and_then(|id| self.titles.title_for(id));
 
-            // A folder is only worth keeping if an editor already has it
-            // open, since that is the only case where revealing it focuses an
-            // existing window instead of creating one.
-            let folder = record
-                .cwd
-                .clone()
-                .filter(|cwd| open_workspaces.is_open(cwd));
-
             sessions.push(SessionView {
                 pid: record.pid,
                 bucket: record.bucket().key(),
@@ -349,14 +333,11 @@ impl SessionRegistry {
                 project: record.project_name(),
                 host: record.host_label(host.as_ref()),
                 waiting_for: record.waiting_for.clone(),
-                focusable: host
-                    .as_ref()
-                    .is_some_and(|h| h.can_focus(folder.as_deref())),
-                precise: host.as_ref().is_some_and(Host::is_precise),
+                focusable: host.as_ref().is_some_and(Host::is_precise),
             });
 
             if let Some(host) = host {
-                known_hosts.insert(record.pid, (host, folder));
+                known_hosts.insert(record.pid, host);
             }
         }
 
@@ -364,10 +345,11 @@ impl SessionRegistry {
         Snapshot { counts, sessions }
     }
 
-    /// Bring a session to the front, as precisely as its host allows.
+    /// Bring a session's terminal tab to the front, if it is one we can
+    /// actually reach.
     pub fn focus(&self, pid: u32) {
-        if let Some((host, folder)) = self.known_hosts.get(&pid) {
-            host.focus(folder.as_deref());
+        if let Some(host) = self.known_hosts.get(&pid) {
+            host.focus();
         }
     }
 

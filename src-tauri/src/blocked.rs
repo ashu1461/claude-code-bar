@@ -67,7 +67,6 @@ mod tests {
             host: "Terminal.app".to_string(),
             waiting_for: None,
             focusable: true,
-            precise: true,
         }
     }
 

@@ -90,9 +90,17 @@ pub struct Host {
 }
 
 impl Host {
-    /// Whether clicking lands on this exact session, or merely on the
-    /// application holding it. The row says which, so a click never promises
-    /// more than it can deliver.
+    /// Whether this session can be reached by clicking, which is the same
+    /// question as whether we can select its exact tab.
+    ///
+    /// Only Terminal.app and iTerm2 qualify, because only they expose their
+    /// tabs to scripting. Editors were tried and dropped: the nearest thing
+    /// available is asking the system to open the session's folder, which
+    /// means "open this document" and creates a new window whenever the
+    /// editor does not already have that folder open the way it expects. A
+    /// click that clutters your screen instead of taking you to your work is
+    /// worse than a row that plainly does nothing, so those rows are not
+    /// clickable.
     pub fn is_precise(&self) -> bool {
         self.scriptable.is_some() && self.tty.is_some()
     }
@@ -146,47 +154,14 @@ impl Host {
         Some(host)
     }
 
-    /// Whether clicking can actually take you somewhere.
+    /// Bring this session's tab to the front.
     ///
-    /// Two cases qualify, and nothing else: a terminal tab we can select by
-    /// its device, and an editor window we know already has this folder open.
-    /// There is deliberately no "bring the application forward" fallback —
-    /// it neither reaches the session nor justifies a click that suggests it
-    /// will, and handing an editor a folder it does not have open would
-    /// create a new window.
-    pub fn can_focus(&self, folder: Option<&str>) -> bool {
-        self.is_precise()
-            || (self.kind == HostKind::Editor && folder.is_some_and(|path| !path.is_empty()))
-    }
-
-    /// Bring this session to the front.
-    ///
-    /// `folder` must be `Some` only when a window is known to have it open.
-    pub fn focus(&self, folder: Option<&str>) {
+    /// Only the scriptable terminals can be reached at all. Editors are left
+    /// alone entirely: see `is_precise` for why.
+    pub fn focus(&self) {
         if self.is_precise() {
             self.focus_exact_tab();
-            return;
         }
-        if let Some(path) = folder.filter(|path| !path.is_empty()) {
-            if self.kind == HostKind::Editor {
-                self.reveal_folder(path);
-            }
-        }
-    }
-
-    /// Focus the window already showing this folder.
-    fn reveal_folder(&self, folder: &str) {
-        let mut command = Command::new("open");
-        command.arg("-a").arg(self.app_name).arg(folder);
-        let app = self.app_name;
-        std::thread::spawn(move || match command.output() {
-            Ok(output) if !output.status.success() => eprintln!(
-                "claude-overview: could not reveal the folder in {app}: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
-            ),
-            Err(error) => eprintln!("claude-overview: could not run open: {error}"),
-            _ => {}
-        });
     }
 
     fn focus_exact_tab(&self) {
@@ -262,12 +237,6 @@ impl HostResolver {
         let host = self.walk(pid);
         self.resolved.insert(pid, host.clone());
         host
-    }
-
-    /// Whether a process is in the table we last read. Used to discard IDE
-    /// lock files left behind by editors that have quit.
-    pub fn is_running(&self, pid: u32) -> bool {
-        self.table.contains_key(&pid)
     }
 
     fn walk(&self, pid: u32) -> Option<Host> {
@@ -489,43 +458,6 @@ mod tests {
             },
         );
         assert!(resolver.walk(10).is_none());
-    }
-
-    #[test]
-    fn only_offers_a_click_when_it_can_actually_land_somewhere() {
-        let terminal_tab = Host {
-            label: "Terminal.app",
-            app_name: "Terminal",
-            kind: HostKind::Terminal,
-            scriptable: Some(ScriptableTerminal::AppleTerminal),
-            tty: Some("ttys009".to_string()),
-        };
-        assert!(terminal_tab.can_focus(None), "exact tab needs no folder");
-
-        let editor = Host {
-            label: "VS Code",
-            app_name: "Visual Studio Code",
-            kind: HostKind::Editor,
-            scriptable: None,
-            tty: None,
-        };
-        // Only when the folder is already open, which is the caller's job to
-        // establish. Otherwise revealing it would create a new window.
-        assert!(editor.can_focus(Some("/Users/me/project")));
-        assert!(!editor.can_focus(None));
-        assert!(!editor.can_focus(Some("")));
-
-        // A terminal we cannot script has no route to the session at all, so
-        // it never becomes clickable.
-        let plain_terminal = Host {
-            label: "Ghostty",
-            app_name: "Ghostty",
-            kind: HostKind::Terminal,
-            scriptable: None,
-            tty: Some("ttys004".to_string()),
-        };
-        assert!(!plain_terminal.can_focus(None));
-        assert!(!plain_terminal.can_focus(Some("/Users/me/project")));
     }
 
     #[test]
