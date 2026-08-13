@@ -112,7 +112,13 @@ The first build pulls in the whole Tauri dependency tree and takes a few minutes
 src-tauri/target/release/bundle/macos/Claude Overview.app
 ```
 
-Drag it into `/Applications` and open it:
+Both icons are generated rather than drawn by hand. If you change them, re-run:
+
+```bash
+python3 tools/generate-icons.py
+```
+
+Drag the app into `/Applications` and open it:
 
 ```bash
 open "target/release/bundle/macos/Claude Overview.app"
@@ -153,4 +159,4 @@ Contributions welcome. Some obvious next steps:
 
 MIT — see [LICENSE](LICENSE).
 
-Not affiliated with Anthropic. The menu bar mark is an original drawing, not an official Anthropic asset.
+Not affiliated with Anthropic. The app icon and menu bar mark are original drawings, not official Anthropic assets — which is also why the app icon is indigo rather than Claude's clay.
