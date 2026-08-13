@@ -342,7 +342,7 @@
     if (session.focusable) {
       row.title = session.precise
         ? "Jump to this session"
-        : `Open ${session.host.replace(/ (terminal|extension)$/, "")} — cannot target this session exactly`;
+        : `Show this project in ${session.host.replace(/ (terminal|extension)$/, "")}`;
       row.addEventListener("click", async () => {
         await invoke("focus_session", { pid: session.pid });
         await invoke("hide_panel");

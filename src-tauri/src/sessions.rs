@@ -6,6 +6,7 @@
 
 use crate::focus::{Host, HostKind, HostResolver};
 use crate::titles::TitleCache;
+use crate::workspaces::OpenWorkspaces;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -209,7 +210,8 @@ pub struct SessionView {
     pub host: String,
     /// Why it is blocked, when it is.
     pub waiting_for: Option<String>,
-    /// Whether clicking the row does anything at all.
+    /// Whether clicking the row goes anywhere. False rows are shown as plain
+    /// information rather than inviting a click that cannot be honoured.
     pub focusable: bool,
     /// Whether clicking lands on this exact session, or only on the
     /// application holding it.
@@ -242,7 +244,7 @@ impl Counts {
     /// bar was just width spent on something you cannot do anything about.
     pub fn tray_title(&self) -> String {
         format!(
-            "{} {}  {} {}  {} {}",
+            "{} {}   {} {}   {} {}",
             Bucket::Waiting.marker(),
             self.waiting,
             Bucket::Running.marker(),
@@ -310,6 +312,10 @@ impl SessionRegistry {
                 .then_with(|| a.project_name().cmp(&b.project_name()))
         });
 
+        // Read once per refresh: which project folders an editor already has
+        // open. Passing any other folder would open a new window.
+        let open_workspaces = OpenWorkspaces::read(|pid| self.hosts.is_running(pid));
+
         let mut counts = Counts::default();
         let mut sessions = Vec::with_capacity(records.len());
         let mut known_hosts = HashMap::with_capacity(records.len());
@@ -328,6 +334,14 @@ impl SessionRegistry {
                 .as_deref()
                 .and_then(|id| self.titles.title_for(id));
 
+            // A folder is only worth keeping if an editor already has it
+            // open, since that is the only case where revealing it focuses an
+            // existing window instead of creating one.
+            let folder = record
+                .cwd
+                .clone()
+                .filter(|cwd| open_workspaces.is_open(cwd));
+
             sessions.push(SessionView {
                 pid: record.pid,
                 bucket: record.bucket().key(),
@@ -335,13 +349,14 @@ impl SessionRegistry {
                 project: record.project_name(),
                 host: record.host_label(host.as_ref()),
                 waiting_for: record.waiting_for.clone(),
-                // Anything we could identify can at least be brought forward.
-                focusable: host.is_some(),
+                focusable: host
+                    .as_ref()
+                    .is_some_and(|h| h.can_focus(folder.as_deref())),
                 precise: host.as_ref().is_some_and(Host::is_precise),
             });
 
             if let Some(host) = host {
-                known_hosts.insert(record.pid, (host, record.cwd.clone()));
+                known_hosts.insert(record.pid, (host, folder));
             }
         }
 
@@ -351,8 +366,8 @@ impl SessionRegistry {
 
     /// Bring a session to the front, as precisely as its host allows.
     pub fn focus(&self, pid: u32) {
-        if let Some((host, cwd)) = self.known_hosts.get(&pid) {
-            host.focus(cwd.as_deref());
+        if let Some((host, folder)) = self.known_hosts.get(&pid) {
+            host.focus(folder.as_deref());
         }
     }
 
@@ -573,11 +588,11 @@ mod tests {
             done: 4,
             unknown: 0,
         };
-        assert_eq!(counts.tray_title(), "❗ 2  🔄 1  ✅ 4");
+        assert_eq!(counts.tray_title(), "❗ 2   🔄 1   ✅ 4");
 
         // Sessions that report nothing stay out of the menu bar entirely.
         counts.unknown = 3;
-        assert_eq!(counts.tray_title(), "❗ 2  🔄 1  ✅ 4");
+        assert_eq!(counts.tray_title(), "❗ 2   🔄 1   ✅ 4");
     }
 
     #[test]

@@ -28,35 +28,39 @@ impl ScriptableTerminal {
         let device = format!("/dev/{tty}");
         match self {
             ScriptableTerminal::AppleTerminal => format!(
-                r#"tell application "Terminal"
-                     activate
-                     repeat with w in windows
-                       repeat with t in tabs of w
-                         if tty of t is "{device}" then
-                           set selected of t to true
-                           set index of w to 1
-                           return
-                         end if
-                       end repeat
-                     end repeat
-                   end tell"#
-            ),
-            ScriptableTerminal::ITerm2 => format!(
-                r#"tell application "iTerm2"
-                     activate
-                     repeat with w in windows
-                       repeat with t in tabs of w
-                         repeat with s in sessions of t
-                           if tty of s is "{device}" then
-                             select w
-                             select t
-                             select s
+                r#"if application "Terminal" is running then
+                     tell application "Terminal"
+                       repeat with w in windows
+                         repeat with t in tabs of w
+                           if tty of t is "{device}" then
+                             set selected of t to true
+                             set index of w to 1
+                             activate
                              return
                            end if
                          end repeat
                        end repeat
-                     end repeat
-                   end tell"#
+                     end tell
+                   end if"#
+            ),
+            ScriptableTerminal::ITerm2 => format!(
+                r#"if application "iTerm2" is running then
+                     tell application "iTerm2"
+                       repeat with w in windows
+                         repeat with t in tabs of w
+                           repeat with s in sessions of t
+                             if tty of s is "{device}" then
+                               select w
+                               select t
+                               select s
+                               activate
+                               return
+                             end if
+                           end repeat
+                         end repeat
+                       end repeat
+                     end tell
+                   end if"#
             ),
         }
     }
@@ -142,37 +146,42 @@ impl Host {
         Some(host)
     }
 
+    /// Whether clicking can actually take you somewhere.
+    ///
+    /// Two cases qualify, and nothing else: a terminal tab we can select by
+    /// its device, and an editor window we know already has this folder open.
+    /// There is deliberately no "bring the application forward" fallback —
+    /// it neither reaches the session nor justifies a click that suggests it
+    /// will, and handing an editor a folder it does not have open would
+    /// create a new window.
+    pub fn can_focus(&self, folder: Option<&str>) -> bool {
+        self.is_precise()
+            || (self.kind == HostKind::Editor && folder.is_some_and(|path| !path.is_empty()))
+    }
+
     /// Bring this session to the front.
     ///
-    /// Where the terminal can be scripted this lands on the exact tab. For
-    /// everything else the best available is opening the application on the
-    /// session's folder, which surfaces the right project window but cannot
-    /// pick out an individual session inside it.
-    pub fn focus(&self, cwd: Option<&str>) {
+    /// `folder` must be `Some` only when a window is known to have it open.
+    pub fn focus(&self, folder: Option<&str>) {
         if self.is_precise() {
             self.focus_exact_tab();
-        } else {
-            self.open_application(cwd);
+            return;
+        }
+        if let Some(path) = folder.filter(|path| !path.is_empty()) {
+            if self.kind == HostKind::Editor {
+                self.reveal_folder(path);
+            }
         }
     }
 
-    /// Ask the system to bring the application forward, on this session's
-    /// folder when there is one so an editor surfaces the right window.
-    fn open_application(&self, cwd: Option<&str>) {
+    /// Focus the window already showing this folder.
+    fn reveal_folder(&self, folder: &str) {
         let mut command = Command::new("open");
-        command.arg("-a").arg(self.app_name);
-        // Only editors do anything useful with a folder; handing one to a
-        // terminal would open a stray window.
-        if self.kind == HostKind::Editor {
-            if let Some(cwd) = cwd.filter(|path| !path.is_empty()) {
-                command.arg(cwd);
-            }
-        }
-
+        command.arg("-a").arg(self.app_name).arg(folder);
         let app = self.app_name;
         std::thread::spawn(move || match command.output() {
             Ok(output) if !output.status.success() => eprintln!(
-                "claude-overview: could not open {app}: {}",
+                "claude-overview: could not reveal the folder in {app}: {}",
                 String::from_utf8_lossy(&output.stderr).trim()
             ),
             Err(error) => eprintln!("claude-overview: could not run open: {error}"),
@@ -194,21 +203,23 @@ impl Host {
             return;
         }
 
-        let script = terminal.script(tty);
-        // AppleScript can take a moment and must never block the menu.
-        std::thread::spawn(move || {
-            match Command::new("osascript").arg("-e").arg(&script).output() {
-                Ok(output) if !output.status.success() => {
-                    eprintln!(
-                        "claude-overview: could not focus the session: {}",
-                        String::from_utf8_lossy(&output.stderr).trim()
-                    );
-                }
-                Err(error) => eprintln!("claude-overview: could not run osascript: {error}"),
-                _ => {}
-            }
-        });
+        run_script(terminal.script(tty), self.app_name);
     }
+}
+
+/// AppleScript can take a moment and must never block the panel, so it runs
+/// off the main thread.
+fn run_script(script: String, app: &'static str) {
+    std::thread::spawn(
+        move || match Command::new("osascript").arg("-e").arg(&script).output() {
+            Ok(output) if !output.status.success() => eprintln!(
+                "claude-overview: could not reach {app}: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ),
+            Err(error) => eprintln!("claude-overview: could not run osascript: {error}"),
+            _ => {}
+        },
+    );
 }
 
 /// One row of the process table.
@@ -251,6 +262,12 @@ impl HostResolver {
         let host = self.walk(pid);
         self.resolved.insert(pid, host.clone());
         host
+    }
+
+    /// Whether a process is in the table we last read. Used to discard IDE
+    /// lock files left behind by editors that have quit.
+    pub fn is_running(&self, pid: u32) -> bool {
+        self.table.contains_key(&pid)
     }
 
     fn walk(&self, pid: u32) -> Option<Host> {
@@ -472,6 +489,43 @@ mod tests {
             },
         );
         assert!(resolver.walk(10).is_none());
+    }
+
+    #[test]
+    fn only_offers_a_click_when_it_can_actually_land_somewhere() {
+        let terminal_tab = Host {
+            label: "Terminal.app",
+            app_name: "Terminal",
+            kind: HostKind::Terminal,
+            scriptable: Some(ScriptableTerminal::AppleTerminal),
+            tty: Some("ttys009".to_string()),
+        };
+        assert!(terminal_tab.can_focus(None), "exact tab needs no folder");
+
+        let editor = Host {
+            label: "VS Code",
+            app_name: "Visual Studio Code",
+            kind: HostKind::Editor,
+            scriptable: None,
+            tty: None,
+        };
+        // Only when the folder is already open, which is the caller's job to
+        // establish. Otherwise revealing it would create a new window.
+        assert!(editor.can_focus(Some("/Users/me/project")));
+        assert!(!editor.can_focus(None));
+        assert!(!editor.can_focus(Some("")));
+
+        // A terminal we cannot script has no route to the session at all, so
+        // it never becomes clickable.
+        let plain_terminal = Host {
+            label: "Ghostty",
+            app_name: "Ghostty",
+            kind: HostKind::Terminal,
+            scriptable: None,
+            tty: Some("ttys004".to_string()),
+        };
+        assert!(!plain_terminal.can_focus(None));
+        assert!(!plain_terminal.can_focus(Some("/Users/me/project")));
     }
 
     #[test]

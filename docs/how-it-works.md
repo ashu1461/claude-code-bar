@@ -133,9 +133,23 @@ end tell
 
 The device name is interpolated into a script, so it is validated against a strict character set first. A test covers that.
 
-**Approximate — everything else.** VS Code, Cursor and the JetBrains editors expose no scriptable route to an individual Claude panel. The best available is `open -a "<app>" <cwd>`, which surfaces the right project window. Terminals get `open -a` without a folder, since handing one to a terminal spawns a stray window rather than focusing anything.
+Two details in that script matter. It is wrapped in `if application "Terminal" is running`, because referring to a stopped application's windows would **launch it** — and launching Terminal creates a window. And `activate` comes *after* a tab matches, so a session whose tab has gone does not steal focus for nothing.
 
-The UI marks the difference with `›` versus `↗`, and the row's tooltip spells it out. **If several sessions share a folder, every one of those rows opens the same window** — nothing distinguishes them from outside the editor.
+**By folder — editors, but only sometimes.** VS Code, Cursor and the JetBrains editors expose no scriptable route to an individual Claude panel. The nearest thing is `open -a "<app>" <folder>`, which brings forward the window showing that folder.
+
+That comes with a trap, and it was a real bug. **`open` means "open this document".** If the folder is not already open in the editor, the editor obeys literally and creates a **new window** — so a click meant to take you to your work instead clutters the screen with an empty one. It only misbehaves for sessions whose folder happens not to be open, which is why it looked intermittent.
+
+So the app first works out what is genuinely open. Claude Code's editor extensions advertise themselves in `~/.claude/ide/<pid>.lock`, and each lock records the workspace its editor has open:
+
+```json
+{"pid": 55635, "workspaceFolders": ["/Users/you/some-project"], "ideName": "Visual Studio Code"}
+```
+
+Those locks outlive their editors exactly as session files do, so they are filtered against the process table first. A folder is passed to `open` **only** if a running editor is holding it. See `workspaces.rs`.
+
+**There is no fallback beyond that**, deliberately. Merely bringing an application forward neither reaches the session nor justifies a click that implies it will, so those rows are not clickable at all. `Host::can_focus` is the single place that decides, and the UI marks the outcome with `›`, `↗`, or no arrow.
+
+**If several sessions share a folder**, every one of those rows brings up the same window. Nothing distinguishes them from outside the editor.
 
 ## 6. The panel, and why it is a window
 
@@ -174,6 +188,7 @@ claude-code-bar/
 │   │   ├── titles.rs      # digs the session title out of the transcript
 │   │   ├── focus.rs       # which app a session runs in, and jumping to it
 │   │   ├── blocked.rs     # spots sessions crossing into the waiting state
+│   │   ├── workspaces.rs  # which folders an editor actually has open
 │   │   ├── panel.rs       # the dropdown window, and where it opens
 │   │   ├── tray.rs        # the menu bar item, the poll loop, the dot animation
 │   │   ├── state.rs       # shared registry and latest snapshot

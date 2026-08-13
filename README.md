@@ -76,14 +76,17 @@ Every row leads with the **session title** — Claude Code's own one-line descri
 
 Sessions with no status stay in the panel but are kept out of the menu bar counts — a number you cannot act on is not worth the width.
 
-**Click a row to jump to that session.** The arrow tells you where you will land:
+**Click a row to jump to that session.** A row is clickable only when there is somewhere real to land, and the arrow says which:
 
-| Arrow | What happens | Where |
+| Arrow | What happens | When |
 |---|---|---|
-| `›` | Selects **that exact tab** | Terminal.app, iTerm2 |
-| `↗` | Opens the **application** on that project | VS Code, Cursor, JetBrains, other terminals |
+| `›` | Selects **that exact tab** | Terminal.app and iTerm2, which expose their tabs to scripting |
+| `↗` | Brings forward the **window already showing that project** | The folder is currently open in VS Code, Cursor, or a JetBrains editor |
+| *(none)* | Not clickable, shown as plain information | Anything else |
 
-Only Terminal.app and iTerm2 let us pick out an individual tab. For everything else the honest best is opening the right project — so if you run several sessions in one folder, those rows all land in the same window. The arrow says so rather than pretending otherwise.
+**It will never open a new window.** That is the rule the design follows, and it is why the third row exists. Handing an editor a folder means "open this", so if the folder is not already open you get a new window instead of your work — which is worse than the click doing nothing. So the app checks what your editors actually have open and only offers a click when it will land on an existing window.
+
+One case it cannot resolve: if several sessions share a folder, those rows all bring up the same window, because nothing distinguishes them from outside the editor.
 
 ## How to install
 

@@ -9,6 +9,7 @@ mod sessions;
 mod state;
 mod titles;
 mod tray;
+mod workspaces;
 
 use sessions::{Bucket, SessionRegistry, Snapshot};
 use state::AppState;
