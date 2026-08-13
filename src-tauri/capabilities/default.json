@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the panel window is allowed to do.",
+  "windows": [
+    "panel"
+  ],
+  "permissions": [
+    "core:default"
+  ]
+}

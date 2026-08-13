@@ -1,0 +1,27 @@
+[package]
+name = "claude-overview"
+version = "0.1.0"
+edition = "2021"
+description = "A macOS menu bar tally of your running Claude Code sessions"
+license = "MIT"
+repository = "https://github.com/ashu1461/claude-code-bar"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "macos-private-api", "image-png"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sysinfo = "0.33"
+
+# Real macOS vibrancy behind the panel, rather than a flat fake.
+[target.'cfg(target_os = "macos")'.dependencies]
+window-vibrancy = "0.6"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true

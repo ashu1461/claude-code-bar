@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Claude Overview</title>
+<style>
+  :root {
+    --text:            rgba(0, 0, 0, 0.92);
+    --text-secondary:  rgba(0, 0, 0, 0.52);
+    --text-tertiary:   rgba(0, 0, 0, 0.38);
+    --divider:         rgba(0, 0, 0, 0.09);
+    --hover:           rgba(0, 0, 0, 0.06);
+    --active:          rgba(0, 0, 0, 0.11);
+    --badge-bg:        rgba(0, 0, 0, 0.06);
+
+    --waiting:  #E5484D;
+    --running:  #F0A020;
+    --done:     #30A46C;
+    --unknown:  #9AA0A6;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --text:            rgba(255, 255, 255, 0.94);
+      --text-secondary:  rgba(255, 255, 255, 0.56);
+      --text-tertiary:   rgba(255, 255, 255, 0.40);
+      --divider:         rgba(255, 255, 255, 0.11);
+      --hover:           rgba(255, 255, 255, 0.09);
+      --active:          rgba(255, 255, 255, 0.15);
+      --badge-bg:        rgba(255, 255, 255, 0.10);
+
+      --waiting:  #FF6369;
+      --running:  #FFB224;
+      --done:     #3DD68C;
+      --unknown:  #A1A1AA;
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    /* The window itself is translucent; macOS vibrancy paints behind it. */
+    background: transparent;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: default;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .panel { display: flex; flex-direction: column; max-height: 520px; }
+
+  /* ---- header ---------------------------------------------------------- */
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--divider);
+  }
+
+  .brand { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+  .subtitle { font-size: 11px; color: var(--text-tertiary); }
+
+  /* ---- alert bar -------------------------------------------------------
+
+     Shown only while something is blocked. A tinted dot was too easy to miss
+     when the whole point of the app is noticing exactly this state.         */
+
+  .alert[hidden] { display: none; }
+
+  .alert {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: color-mix(in srgb, var(--waiting) 12%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--waiting) 25%, transparent);
+    color: var(--waiting);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .alert::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--waiting);
+    flex: none;
+  }
+
+  /* ---- session list ---------------------------------------------------- */
+
+  .list { overflow-y: auto; padding: 4px 0; }
+  .list::-webkit-scrollbar { width: 0; }
+
+  .section {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 14px 5px;
+  }
+
+  .section .label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  .section .count {
+    margin-left: auto;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-tertiary);
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: none;
+    background: var(--unknown);
+  }
+  .dot.waiting { background: var(--waiting); }
+  .dot.running { background: var(--running); }
+  .dot.done    { background: var(--done); }
+  .dot.unknown { background: var(--unknown); }
+
+  .row {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    width: 100%;
+    padding: 6px 14px 7px;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+  }
+
+  .row .dot { margin-top: 4px; }
+
+  .row.clickable:hover  { background: var(--hover); }
+  .row.clickable:active { background: var(--active); }
+  .row.clickable        { cursor: default; }
+
+  /* The blocked group is tinted as a block, so it reads as one urgent area
+     rather than a few rows that happen to have red dots. Declared after the
+     hover rules above so the tint survives hovering. */
+  .row.waiting {
+    background: color-mix(in srgb, var(--waiting) 6%, transparent);
+    box-shadow: inset 2px 0 0 var(--waiting);
+  }
+  .row.waiting:hover,
+  .row.waiting.clickable:hover {
+    background: color-mix(in srgb, var(--waiting) 11%, transparent);
+  }
+
+  .section.waiting .label { color: var(--waiting); }
+
+  .row .body { min-width: 0; flex: 1; }
+
+  .row .title {
+    display: block;
+    font-size: 12.5px;
+    line-height: 1.35;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .row .sub {
+    display: block;
+    margin-top: 1px;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .row .reason {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--waiting) 15%, transparent);
+    color: var(--waiting);
+    font-size: 10.5px;
+    font-weight: 500;
+  }
+
+  .row .chev {
+    align-self: center;
+    font-size: 13px;
+    color: var(--text-tertiary);
+    opacity: 0;
+    flex: none;
+  }
+  .row.clickable:hover .chev { opacity: 1; }
+
+  /* Dimmer, because the click does less: it opens the application rather
+     than landing on this session. */
+  .chev.approx { font-size: 11px; }
+  .row.clickable:hover .chev.approx { opacity: 0.55; }
+
+  .empty {
+    padding: 26px 14px;
+    text-align: center;
+    color: var(--text-tertiary);
+    font-size: 12px;
+  }
+
+  /* ---- footer ---------------------------------------------------------- */
+
+  footer {
+    border-top: 1px solid var(--divider);
+    padding: 5px 6px;
+  }
+
+  .action {
+    display: block;
+    width: 100%;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    font: inherit;
+    font-size: 12.5px;
+    color: var(--text);
+    text-align: left;
+    cursor: default;
+  }
+  .action:hover  { background: var(--hover); }
+  .action:active { background: var(--active); }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <header>
+      <span class="brand">Claude Code</span>
+      <span class="subtitle" id="subtitle"></span>
+    </header>
+    <div class="alert" id="alert" hidden></div>
+    <div class="list" id="list"></div>
+    <footer>
+      <button class="action" id="quit">Quit Claude Overview</button>
+    </footer>
+  </div>
+
+<script>
+  const invoke = window.__TAURI__.core.invoke;
+
+  const GROUPS = [
+    { key: "waiting", label: "Waiting for input" },
+    { key: "running", label: "Running" },
+    { key: "done",    label: "Done" },
+    { key: "unknown", label: "No status reported" },
+  ];
+
+  const list = document.getElementById("list");
+  const subtitle = document.getElementById("subtitle");
+  const alert = document.getElementById("alert");
+
+  document.getElementById("quit").addEventListener("click", () => invoke("quit_app"));
+
+  function dot(bucket) {
+    const el = document.createElement("span");
+    el.className = `dot ${bucket}`;
+    return el;
+  }
+
+  function sectionHeader(label, bucket, count) {
+    const section = document.createElement("div");
+    section.className = `section ${bucket}`;
+
+    const name = document.createElement("span");
+    name.className = "label";
+    name.textContent = label;
+
+    const total = document.createElement("span");
+    total.className = "count";
+    total.textContent = count;
+
+    section.append(dot(bucket), name, total);
+    return section;
+  }
+
+  function sessionRow(session) {
+    const row = document.createElement("button");
+    row.className = `row ${session.bucket}` + (session.focusable ? " clickable" : "");
+
+    const body = document.createElement("span");
+    body.className = "body";
+
+    // Titles come from conversation content, so they are only ever set as
+    // text — never parsed as markup.
+    const title = document.createElement("span");
+    title.className = "title";
+    title.textContent = session.title || session.project;
+
+    const sub = document.createElement("span");
+    sub.className = "sub";
+    // When the title is doing the describing, the project name still belongs
+    // on the row; when it isn't, repeating it would be noise.
+    sub.textContent = session.title
+      ? `${session.project} · ${session.host}`
+      : session.host;
+
+    body.append(title, sub);
+
+    if (session.waitingFor) {
+      const reason = document.createElement("span");
+      reason.className = "reason";
+      reason.textContent = session.waitingFor;
+      body.append(reason);
+    }
+
+    const chevron = document.createElement("span");
+    chevron.className = session.precise ? "chev" : "chev approx";
+    // An arrow for landing on the exact session, an outward arrow for merely
+    // opening the application that holds it.
+    chevron.textContent = session.precise ? "›" : "↗";
+
+    row.append(dot(session.bucket), body, chevron);
+
+    if (session.focusable) {
+      row.title = session.precise
+        ? "Jump to this session"
+        : `Open ${session.host.replace(/ (terminal|extension)$/, "")} — cannot target this session exactly`;
+      row.addEventListener("click", async () => {
+        await invoke("focus_session", { pid: session.pid });
+        await invoke("hide_panel");
+      });
+    }
+
+    return row;
+  }
+
+  function render(snapshot) {
+    const sessions = snapshot.sessions || [];
+    const total = sessions.length;
+
+    const waiting = (snapshot.counts && snapshot.counts.waiting) || 0;
+    alert.hidden = waiting === 0;
+    alert.textContent = waiting === 1
+      ? "1 session needs your input"
+      : `${waiting} sessions need your input`;
+    subtitle.textContent = total === 0
+      ? "nothing running"
+      : `${total} session${total === 1 ? "" : "s"}`;
+
+    const next = document.createDocumentFragment();
+
+    if (total === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "No Claude sessions running";
+      next.append(empty);
+    } else {
+      for (const group of GROUPS) {
+        const inGroup = sessions.filter((s) => s.bucket === group.key);
+        if (inGroup.length === 0) continue;
+        next.append(sectionHeader(group.label, group.key, inGroup.length));
+        for (const session of inGroup) next.append(sessionRow(session));
+      }
+    }
+
+    list.replaceChildren(next);
+    fitWindow();
+  }
+
+  /** Ask the window to match the content, so short lists get a short panel. */
+  function fitWindow() {
+    const height = document.querySelector(".panel").scrollHeight;
+    invoke("resize_panel", { height: Math.ceil(height) + 2 });
+  }
+
+  let inFlight = false;
+  async function refresh() {
+    if (inFlight || document.hidden) return;
+    inFlight = true;
+    try {
+      render(await invoke("get_snapshot"));
+    } catch (error) {
+      console.error("claude-overview: could not read sessions", error);
+    } finally {
+      inFlight = false;
+    }
+  }
+
+  refresh();
+  setInterval(refresh, 1000);
+  document.addEventListener("visibilitychange", refresh);
+</script>
+</body>
+</html>
