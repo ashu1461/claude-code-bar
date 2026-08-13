@@ -42,7 +42,7 @@ SUPERSAMPLE = 8       # 8x8 samples per pixel, so edges get 64 alpha levels
 
 HEIGHT = LOGICAL * SCALE
 PAD_RIGHT = 7 * SCALE     # gap between the artwork and the counts
-GAP = 7 * SCALE           # gap between the mark and the first dot
+GAP = 12 * SCALE          # gap between the mark and the first dot
 
 CLAY = (0xD9, 0x77, 0x57)         # the mark
 DOT_LIT = (0xFF, 0x6B, 0x6B)      # the travelling highlight
