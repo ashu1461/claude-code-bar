@@ -85,7 +85,7 @@ fn main() {
 
 fn print_snapshot() {
     let snapshot = SessionRegistry::new().snapshot();
-    println!("Menu bar shows: {}", snapshot.counts.tray_title());
+    println!("{}", snapshot.counts.summary());
     println!();
 
     if snapshot.sessions.is_empty() {

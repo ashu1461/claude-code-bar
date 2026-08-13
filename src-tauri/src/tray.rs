@@ -30,9 +30,11 @@ pub fn start<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .build(app)?;
     let menu = MenuBuilder::new(app).item(&quit).build()?;
 
+    // No title: the item is the mark alone, plus the dots when something is
+    // blocked. Counts as text made it the widest thing in the menu bar, which
+    // is what gets an item dropped when the bar runs out of room.
     TrayIconBuilder::with_id(TRAY_ID)
         .icon_as_template(false)
-        .title("…")
         .tooltip("Claude Code sessions")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -112,7 +114,7 @@ fn spawn_poller<R: Runtime>(app: AppHandle<R>) {
                 });
             }
 
-            let title = snapshot.counts.tray_title();
+            let summary = snapshot.counts.summary();
             // The animation runs on its own timer, so the poll only reports
             // whether anything is blocked.
             ALARM.store(snapshot.counts.waiting > 0, Ordering::Relaxed);
@@ -122,9 +124,14 @@ fn spawn_poller<R: Runtime>(app: AppHandle<R>) {
             let handle = app.clone();
             let dispatched = app.run_on_main_thread(move || {
                 if let Some(tray) = handle.tray_by_id(TRAY_ID) {
-                    if let Err(error) = tray.set_title(Some(title)) {
-                        eprintln!("claude-overview: could not update the menu bar: {error}");
+                    // The counts live here rather than in the bar itself.
+                    if let Err(error) = tray.set_tooltip(Some(&summary)) {
+                        eprintln!("claude-overview: could not update the tooltip: {error}");
                     }
+                    // Where macOS has actually placed the item, which is how
+                    // you tell "hidden because the bar is full" from "on the
+                    // other display".
+                    debug::log(format!("tray rect: {:?}", tray.rect()));
                 }
             });
             if dispatched.is_err() {

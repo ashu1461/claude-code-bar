@@ -206,6 +206,8 @@ Most of the interesting logic is in `sessions.rs` and `focus.rs`.
 
 **The menu bar animation** swaps between three pre-rendered PNGs on a 380 ms timer, because macOS has no animated status item image. That timer only does work while something is blocked.
 
+**The item carries no text**, which is a width decision rather than a style one. macOS silently drops status items when the bar runs out of room, and it drops the widest first. With the counts rendered as text the item measured 159pt — more than most applications take in total. As the mark alone it measures 20pt. The counts live in the tooltip and the panel instead. `tray.rect()` reports the item's real size, which is how to check this if you change the artwork.
+
 ## 9. Checking what it sees
 
 When a number looks wrong, ask the app instead of guessing:
@@ -215,7 +217,7 @@ When a number looks wrong, ask the app instead of guessing:
 ```
 
 ```
-Menu bar shows: ❗ 0  🔄 2  ✅ 3
+Claude Code — 0 waiting · 2 running · 3 done
 
 🔄 Running — 2
       claude-code-bar-c2 · Terminal.app

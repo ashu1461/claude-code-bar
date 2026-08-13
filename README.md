@@ -2,11 +2,12 @@
 
 A small macOS menu bar app that shows what all your Claude Code sessions are doing — and pops open by itself the moment one gets stuck waiting for you.
 
-```
-✳  ❗ 2  🔄 1  ✅ 4
-```
+The menu bar shows the Claude mark, and three red dots beside it when a session is waiting on you. Hover for the counts; click for the detail.
 
-Two sessions are waiting for you, one is working, four are done.
+```
+    ✳            nothing needs you
+    ✳ ●●●        something is waiting
+```
 
 ## Contents
 
@@ -35,7 +36,13 @@ Everything it shows is read from files Claude Code already writes. It never writ
 
 ## How it looks
 
-The menu bar item is the Claude mark plus three counts. The dots only appear while a session is blocked, so the bar stays quiet the rest of the time.
+The menu bar item is deliberately tiny — about 20pt, smaller than most status icons. It is the Claude mark on its own, with three animated red dots beside it while a session is blocked.
+
+That is a deliberate trade. An earlier version put the counts in the bar as text and came to 159pt, which is wider than most applications take in total, and wide enough that macOS starts silently dropping the item when your menu bar fills up. The counts moved to the tooltip, which costs no width at all:
+
+```
+Claude Code — 2 waiting · 1 running · 4 done
+```
 
 Click it — or wait for it to open itself — and you get the full picture:
 

@@ -233,21 +233,23 @@ impl Counts {
         }
     }
 
-    /// The compact readout that sits in the menu bar itself.
+    /// The counts in words, for the menu bar item's tooltip.
     ///
-    /// Only the three states you can act on appear here. Sessions that report
-    /// nothing are still listed in the panel, but a count of them in the menu
-    /// bar was just width spent on something you cannot do anything about.
-    pub fn tray_title(&self) -> String {
-        format!(
-            "{} {}   {} {}   {} {}",
-            Bucket::Waiting.marker(),
-            self.waiting,
-            Bucket::Running.marker(),
-            self.running,
-            Bucket::Done.marker(),
-            self.done,
-        )
+    /// The item itself is deliberately just the mark. Counts as text cost
+    /// well over a hundred points of menu bar width, which is more than most
+    /// applications take in total and enough that macOS starts dropping the
+    /// item when the bar fills up. Hovering costs nothing, and the panel has
+    /// the full picture a click away.
+    pub fn summary(&self) -> String {
+        let mut parts = vec![
+            format!("{} waiting", self.waiting),
+            format!("{} running", self.running),
+            format!("{} done", self.done),
+        ];
+        if self.unknown > 0 {
+            parts.push(format!("{} not reporting", self.unknown));
+        }
+        format!("Claude Code — {}", parts.join(" · "))
     }
 }
 
@@ -563,18 +565,24 @@ mod tests {
     }
 
     #[test]
-    fn formats_the_tray_title() {
+    fn summarises_the_counts_for_the_tooltip() {
         let mut counts = Counts {
             waiting: 2,
             running: 1,
             done: 4,
             unknown: 0,
         };
-        assert_eq!(counts.tray_title(), "❗ 2   🔄 1   ✅ 4");
+        assert_eq!(
+            counts.summary(),
+            "Claude Code — 2 waiting · 1 running · 4 done"
+        );
 
-        // Sessions that report nothing stay out of the menu bar entirely.
+        // Sessions that report nothing are mentioned only when there are some.
         counts.unknown = 3;
-        assert_eq!(counts.tray_title(), "❗ 2   🔄 1   ✅ 4");
+        assert_eq!(
+            counts.summary(),
+            "Claude Code — 2 waiting · 1 running · 4 done · 3 not reporting"
+        );
     }
 
     #[test]
