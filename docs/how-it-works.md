@@ -53,7 +53,9 @@ The fields that matter:
 
 Only these are read. Unknown fields are ignored, so Claude Code adding new ones will not break parsing.
 
-**A session that reports no status at all** is almost always the VS Code extension. It registers itself but never publishes what it is doing. That is a limit of what Claude Code writes down, not something this app can work around, so those sessions get their own group.
+**A session that reports no status at all** is an editor-extension session. It registers itself and then writes nothing — measurably: an actively working extension session had left both its registry file and its transcript untouched for over eight minutes, while a terminal session beside it updated every nineteen seconds. There is no freshness signal to infer from either.
+
+Section 2b covers how hooks fill that gap.
 
 ## 2. Where session titles come from
 
@@ -68,6 +70,33 @@ Claude Code also writes a generated one-line description into the session transc
 The last one wins. Transcripts run to megabytes, so the app never reads one whole — it reads the last 128 KB and scans backwards, and only re-reads when the file's size or timestamp has changed since the last look. Everything else comes from cache.
 
 The transcript is found by searching the project directories for `<sessionId>.jsonl`, rather than by reconstructing the folder name from the session's path. That way, however Claude Code chooses to mangle a path into a directory name, this keeps working.
+
+## 2b. Status for sessions that publish none
+
+Claude Code's hooks are part of Claude Code, not of any one front end, so they fire wherever a session runs — including inside an editor extension. That makes them the one reliable source of state for sessions the registry cannot describe.
+
+Four hooks are installed into `~/.claude/settings.json`, each invoking this binary with `--hook`:
+
+| Hook | Recorded as |
+|---|---|
+| `UserPromptSubmit` | `busy` |
+| `Notification` | `waiting`, with the reason from `notification_type` |
+| `Stop` | `idle` |
+| `SessionEnd` | the state file is deleted |
+
+The payload carries `session_id`, which is exactly what the registry records for every session, so the two join cleanly. The registry keeps supplying the process ID and therefore the liveness check; hooks supply only the status.
+
+`PreToolUse` is deliberately not used. It fires on every tool call and each firing spawns a process; the four above capture every state change already.
+
+**The registry always wins.** `SessionRecord::bucket_with` only consults hooks when the record has no `status` of its own, so a terminal session can never be second-guessed by a stale hook file.
+
+Three things the hook path has to get right, all covered by tests:
+
+- **It must be silent.** Anything written to stdout or stderr surfaces inside somebody's Claude Code session. Every failure path exits quietly.
+- **Session ids become filenames**, so they are checked against a strict character set. A traversal attempt is dropped.
+- **Installing must not damage the user's settings.** The file is parsed and re-serialised whole so unrelated keys and other tools' hooks survive verbatim, a backup is taken before the first change, the write is atomic via a temporary file and rename, and running twice changes nothing. If the app moves, its existing entry is rewritten rather than duplicated.
+
+Set `CLAUDE_CODE_BAR_NO_HOOK_INSTALL=1` to skip installation entirely.
 
 ## 3. Telling live sessions from dead ones
 
@@ -188,6 +217,7 @@ claude-code-bar/
 │   │   ├── titles.rs      # digs the session title out of the transcript
 │   │   ├── focus.rs       # which app a session runs in, and jumping to it
 │   │   ├── blocked.rs     # spots sessions crossing into the waiting state
+│   │   ├── hooks.rs       # status for sessions that publish none, via Claude Code hooks
 │   │   ├── panel.rs       # the dropdown window, and where it opens
 │   │   ├── tray.rs        # the menu bar item, the poll loop, the dot animation
 │   │   ├── state.rs       # shared registry and latest snapshot

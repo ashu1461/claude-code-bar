@@ -5,6 +5,7 @@
 //! We only read those files — nothing here ever writes to them.
 
 use crate::focus::{Host, HostKind, HostResolver};
+use crate::hooks::HookStates;
 use crate::titles::TitleCache;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -105,6 +106,37 @@ pub struct SessionRecord {
 }
 
 impl SessionRecord {
+    /// The session's state, preferring what it publishes itself.
+    ///
+    /// Only sessions that publish nothing — the editor extensions — fall back
+    /// to what the hooks recorded, so a terminal session is never second
+    /// guessed by a stale hook file.
+    pub fn bucket_with(&self, hooks: &HookStates) -> Bucket {
+        if self.status.is_some() {
+            return self.bucket();
+        }
+        match self.hook_status(hooks) {
+            Some("waiting") => Bucket::Waiting,
+            Some("busy") => Bucket::Running,
+            Some("idle") => Bucket::Done,
+            _ => Bucket::Unknown,
+        }
+    }
+
+    fn hook_status<'a>(&self, hooks: &'a HookStates) -> Option<&'a str> {
+        let id = self.session_id.as_deref()?;
+        Some(hooks.get(id)?.status.as_str())
+    }
+
+    /// Why it is blocked, from whichever source knows.
+    pub fn waiting_reason(&self, hooks: &HookStates) -> Option<String> {
+        if self.status.is_some() {
+            return self.waiting_for.clone();
+        }
+        let id = self.session_id.as_deref()?;
+        hooks.get(id)?.reason.clone()
+    }
+
     pub fn bucket(&self) -> Bucket {
         match self.status.as_deref() {
             Some("waiting") => Bucket::Waiting,
@@ -298,6 +330,9 @@ impl SessionRegistry {
             ProcessRefreshKind::nothing(),
         );
 
+        // What the hooks have recorded for sessions that publish nothing.
+        let hooks = HookStates::read();
+
         let mut records: Vec<SessionRecord> = self
             .read_records()
             .into_iter()
@@ -305,8 +340,8 @@ impl SessionRegistry {
             .collect();
 
         records.sort_by(|a, b| {
-            a.bucket()
-                .cmp(&b.bucket())
+            a.bucket_with(&hooks)
+                .cmp(&b.bucket_with(&hooks))
                 .then_with(|| a.project_name().cmp(&b.project_name()))
         });
 
@@ -315,7 +350,7 @@ impl SessionRegistry {
         let mut known_hosts = HashMap::with_capacity(records.len());
 
         for record in &records {
-            match record.bucket() {
+            match record.bucket_with(&hooks) {
                 Bucket::Waiting => counts.waiting += 1,
                 Bucket::Running => counts.running += 1,
                 Bucket::Done => counts.done += 1,
@@ -330,11 +365,11 @@ impl SessionRegistry {
 
             sessions.push(SessionView {
                 pid: record.pid,
-                bucket: record.bucket().key(),
+                bucket: record.bucket_with(&hooks).key(),
                 title,
                 project: record.project_name(),
                 host: record.host_label(host.as_ref()),
-                waiting_for: record.waiting_for.clone(),
+                waiting_for: record.waiting_reason(&hooks),
                 focusable: host.as_ref().is_some_and(Host::is_precise),
             });
 

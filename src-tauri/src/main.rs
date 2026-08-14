@@ -4,6 +4,7 @@
 mod blocked;
 mod debug;
 mod focus;
+mod hooks;
 mod panel;
 mod sessions;
 mod state;
@@ -55,6 +56,13 @@ fn main() {
     // `--counts` prints what the panel would show and exits, so you can check
     // what the app is reading — handy for scripting, or for working out why a
     // number looks wrong.
+    // Claude Code runs this on every hook event. It must stay quick and
+    // silent: anything printed here surfaces in someone's Claude session.
+    if std::env::args().any(|arg| arg == "--hook") {
+        hooks::record_event();
+        return;
+    }
+
     if std::env::args().any(|arg| arg == "--counts") {
         print_snapshot();
         return;
@@ -74,6 +82,10 @@ fn main() {
             // it lives in the menu bar only.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+            // Editor-extension sessions publish no status of their own, so
+            // the hooks are what make them visible.
+            hooks::ensure_installed();
 
             panel::create(app.handle())?;
             tray::start(app.handle())?;

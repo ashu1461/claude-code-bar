@@ -79,9 +79,32 @@ Every row leads with the **session title** — Claude Code's own one-line descri
 | 🔴 | Waiting for input | Blocked on a prompt. **This one needs you.** |
 | 🟠 | Running | Working on your turn right now. |
 | 🟢 | Done | Finished, ready for the next instruction. |
-| ⚪ | No status reported | Running, but not saying what it is doing. Almost always the VS Code extension, which registers its sessions without publishing a status. |
+| ⚪ | No status reported | Running, but not saying what it is doing — see below. |
 
 Sessions with no status stay in the panel but are kept out of the menu bar counts — a number you cannot act on is not worth the width.
+
+### Editor extension sessions
+
+Claude Code run in a terminal publishes its state continuously. Claude Code run from an **editor extension** does not: it registers itself once and then writes nothing at all while it works, so there is no way to tell from disk whether it is busy, blocked, or finished.
+
+The app closes that gap with **Claude Code hooks**, which are part of Claude Code itself and therefore fire wherever a session runs. On first launch the app adds four hooks to `~/.claude/settings.json`:
+
+| Hook | Meaning |
+|---|---|
+| `UserPromptSubmit` | the session started working |
+| `Notification` | it needs you, and why |
+| `Stop` | it finished |
+| `SessionEnd` | it is gone |
+
+Each one runs the app's own binary with `--hook`, which records the state under `~/.claude/claude-code-bar/`. Terminal sessions are unaffected — where a session publishes its own status, that always wins.
+
+**About it editing your settings.** It backs the file up to `settings.json.before-claude-code-bar` first, only ever adds to what is there, and re-running changes nothing. To keep it out of your configuration entirely:
+
+```bash
+CLAUDE_CODE_BAR_NO_HOOK_INSTALL=1 open "Claude Overview.app"
+```
+
+Without the hooks, extension sessions still appear with their titles — just without a state.
 
 **Sessions running in Terminal.app or iTerm2 are clickable** — a `›` marks them, and clicking selects that exact tab. Both terminals expose their tabs to scripting, so the app can match the session's terminal device and land on precisely the right one.
 
