@@ -60,7 +60,9 @@ APP_OUTER = 0.30                  # sunburst radius, fraction of the tile
 APP_STROKE = 0.040                # stroke half-width, fraction of the tile
 APP_SAMPLES = 2                   # 1024px is big enough that 2x2 is ample
 
-CLAY = (0xD9, 0x77, 0x57)         # the menu bar mark
+# The menu bar mark, matching the app icon. A touch lighter than the app
+# tile, because a saturated indigo goes muddy against a dark menu bar.
+CLAY = (0x5C, 0x7C, 0xFA)
 DOT_LIT = (0xFF, 0x6B, 0x6B)      # the travelling highlight
 DOT_DIM = (0xD0, 0x3C, 0x3C)      # the other two, still fully opaque
 

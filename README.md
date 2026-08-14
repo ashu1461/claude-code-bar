@@ -159,4 +159,4 @@ Contributions welcome. Some obvious next steps:
 
 MIT — see [LICENSE](LICENSE).
 
-Not affiliated with Anthropic. The app icon and menu bar mark are original drawings, not official Anthropic assets — which is also why the app icon is indigo rather than Claude's clay.
+Not affiliated with Anthropic. The app icon and menu bar mark are original drawings, not official Anthropic assets — which is also why they are indigo rather than Claude's clay.
